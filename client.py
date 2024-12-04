@@ -5,7 +5,7 @@ import pickle
 import json
 
 # 서버 주소와 포트
-SERVER_IP = '127.0.0.1'  # 서버 IP 주소
+SERVER_IP = '210.126.11.68'  # 서버 IP 주소
 SERVER_PORT = 9999       # 서버 포트 번호
 
 # 소켓 생성 및 연결

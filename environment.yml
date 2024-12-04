@@ -1,5 +1,5 @@
-name: "C:\\Users\\snuli\anaconda3\envs\\push-up"
+name: "push-up"
 channels:
   - conda-forge
   - defaults
-prefix: "C:\\Users\\snuli\anaconda3\envs\\push-up"
+prefix: "push-up"

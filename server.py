@@ -3,22 +3,24 @@ import socket
 import struct
 import pickle
 import mediapipe as mp
+import json
 
 # Mediapipe 초기화
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
-# 서버 주소와 포트
-HOST = '0.0.0.0'  # 모든 IP에서 수신
-PORT = 9999       # 서버 포트 번호
+# POSE_CONNECTIONS을 JSON 직렬화 가능한 형태로 변환
+connections = [(conn[0], conn[1]) for conn in mp_pose.POSE_CONNECTIONS]
 
-# 소켓 생성 및 바인딩
+# 서버 설정
+HOST = '0.0.0.0'
+PORT = 9999
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((HOST, PORT))
 server_socket.listen(1)
 print(f"서버가 {PORT} 포트에서 수신 대기 중입니다...")
 
-# 클라이언트 연결 수락
 conn, addr = server_socket.accept()
 print(f"클라이언트 {addr} 연결됨.")
 
@@ -29,7 +31,7 @@ payload_size = struct.calcsize(">L")
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     try:
         while True:
-            # 패킷 크기 수신
+            # 프레임 데이터 수신
             while len(data) < payload_size:
                 data += conn.recv(4096)
 
@@ -37,7 +39,6 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             data = data[payload_size:]
             msg_size = struct.unpack(">L", packed_size)[0]
 
-            # 실제 데이터 수신
             while len(data) < msg_size:
                 data += conn.recv(4096)
 
@@ -47,24 +48,33 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             # 프레임 디코딩
             frame = pickle.loads(frame_data)
 
-            # Mediapipe를 사용해 포즈 추정
+            # Mediapipe로 포즈 추정
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = pose.process(image)
 
-            # 포즈 랜드마크를 영상 위에 그리기
+            # 키포인트 좌표 추출
+            landmarks = []
             if results.pose_landmarks:
-                mp_drawing.draw_landmarks(
-                    frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
-                )
+                for landmark in results.pose_landmarks.landmark:
+                    landmarks.append({
+                        "x": landmark.x,
+                        "y": landmark.y,
+                        "z": landmark.z,
+                        "visibility": landmark.visibility
+                    })
 
-            # 결과 영상 표시
-            cv2.imshow('Server - Pose Detection', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            # 좌표와 연결 정보를 포함한 데이터 생성
+            response_data = {
+                "landmarks": landmarks,
+                "connections": connections
+            }
+            response_json = json.dumps(response_data)
+
+            # 데이터 길이와 함께 전송
+            conn.sendall(struct.pack(">L", len(response_json)) + response_json.encode('utf-8'))
 
     except KeyboardInterrupt:
         print("서버 중단")
     finally:
         conn.close()
         server_socket.close()
-        cv2.destroyAllWindows()

@@ -1,5 +1,0 @@
-name: "push-up"
-channels:
-  - conda-forge
-  - defaults
-prefix: "push-up"
